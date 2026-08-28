@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StarryKnight Order Parser</title>
+<style>
+
+/* =========================
+   APP UI (upload screen, settings, messages)
+========================== */
+
+:root {
+  --app-accent: #b5788f;
+  --app-accent-dark: #93576d;
+  --app-bg: #faf6f4;
+  --app-border: #e2d6d1;
+  --app-text: #3a2e2b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+  background: var(--app-bg);
+  color: var(--app-text);
+  margin: 0;
+  padding: 24px 16px 60px;
+}
+
+.app-wrap {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.app-wrap h1 {
+  font-size: 1.5rem;
+  margin: 0 0 4px;
+}
+
+.app-sub {
+  color: #6b5c57;
+  margin: 0 0 20px;
+  font-size: 0.95rem;
+}
+
+.app-card {
+  background: #fff;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.upload-area {
+  border: 2px dashed var(--app-border);
+  border-radius: 10px;
+  padding: 28px 16px;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.upload-area.dragover {
+  border-color: var(--app-accent);
+  background: #fbf1f4;
+}
+
+.upload-area label.pick-btn {
+  display: inline-block;
+  background: var(--app-accent);
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.upload-area label.pick-btn:hover { background: var(--app-accent-dark); }
+
+.upload-area input[type=file] { display: none; }
+
+.upload-hint {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: #8a7a75;
+}
+
+.app-filename {
+  margin-top: 12px;
+  font-size: 0.9rem;
+  color: var(--app-text);
+}
+
+details.app-settings {
+  font-size: 0.9rem;
+}
+
+details.app-settings summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 0;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+@media (max-width: 640px) {
+  .settings-grid { grid-template-columns: 1fr; }
+}
+
+.settings-grid label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.settings-grid textarea {
+  width: 100%;
+  height: 140px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  padding: 8px;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  resize: vertical;
+}
+
+.app-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.app-row input[type=text] {
+  padding: 6px 8px;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.app-btn {
+  background: #fff;
+  border: 1px solid var(--app-accent);
+  color: var(--app-accent-dark);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.app-btn:hover { background: #fbf1f4; }
+
+.app-btn.primary {
+  background: var(--app-accent);
+  color: #fff;
+  border-color: var(--app-accent);
+}
+
+.app-btn.primary:hover { background: var(--app-accent-dark); }
+
+#messages {
+  margin: 16px 0;
+}
+
+.msg {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+
+.msg.info { background: #eef7ee; color: #2b5e2b; }
+.msg.warn { background: #fff6e0; color: #7a5c00; }
+.msg.error { background: #fdeaea; color: #942b2b; }
+
+#reportControls {
+  margin: 16px 0;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.app-footer-note {
+  font-size: 0.78rem;
+  color: #9a8b86;
+  margin-top: 20px;
+  line-height: 1.5;
+}
+
+@media print {
+  .app-wrap > .app-card, .app-wrap > h1, .app-wrap > .app-sub, #reportControls, .app-footer-note {
+    display: none !important;
+  }
+}
+
+/* =========================
+   REPORT (ported verbatim from utility_modules/makeHtml.py get_preamble)
+========================== */
+
+#report table {
+    font-size: 12px;
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 40px;
+}
+
+#report th, #report td {
+    border: 1px solid black;
+    padding: 6px;
+    vertical-align: top;
+}
+
+#report th {
+    background-color: #D3D3D3;
+}
+
+#report td {
+    min-width: 30px;
+}
+
+#report h2 {
+    margin-top: 40px;
+}
+
+#report td.size-group {
+    background-color: #D3D3D3;
+    color: #000000;
+    font-weight: bold;
+    text-align: center;
+    padding: 4px 6px;
+}
+
+#report tr.size-group-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+#report table.flat-table {
+    table-layout: fixed;
+    margin: 0;
+}
+
+#report table.flat-table col.col-0 { width: 8%; }
+#report table.flat-table col.col-1 { width: 22%; }
+#report table.flat-table col.col-2 { width: 70%; }
+
+#report tr.category-group-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+#report td.category-group {
+    background-color: #ffffff;
+    border: none;
+    text-align: left;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 14px 0 0 0;
+}
+
+#report span.order-details {
+    display: block;
+    word-break: break-word;
+    font-family: Arial, sans-serif;
+    font-size: 9px;
+    margin: 0;
+}
+
+#report .table-columns {
+    column-gap: 20px;
+    column-fill: auto;
+    margin-bottom: 20px;
+}
+
+#report .table-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    margin-bottom: 20px;
+}
+
+#report h1.table-title {
+    font-size: 16px;
+    margin: 20px 0 6px 0;
+}
+
+#report ul { margin: 0; padding-left: 12px; }
+#report li { margin-bottom: 4px; }
+#report li:hover { background-color: #f0f0f0; }
+
+#report .order {
+    border: 1px solid #ddd;
+    padding: 3px 6px;
+    margin-bottom: 0;
+    border-radius: 6px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    cursor: pointer;
+    width: 100%;
+    height: 16px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#report .order.red { background-color: #ff9999; }
+#report .order.yellow { background-color: #FFBF00; }
+#report .order.gray { background-color: #d3d3d3; }
+#report .order.green { background-color: #90ee90; }
+
+@media print {
+    @page { size: portrait; margin: 0.5in; }
+    #report thead { display: table-header-group; }
+    #report .page-break { break-before: page; page-break-before: always; }
+    #report tr { page-break-inside: avoid; }
+    #report li:hover { background-color: transparent; }
+}
+
+</style>
+</head>
+<body>
+<div class="app-wrap">
+
+  <h1>StarryKnight Order Parser</h1>
+  <p class="app-sub">Upload a Shopify <code>orders_export.csv</code> to generate a print-ready production cut sheet &mdash; runs entirely in your browser, no upload to any server.</p>
+
+  <div class="app-card">
+    <div class="upload-area" id="uploadArea">
+      <label class="pick-btn" for="csvInput">Choose orders_export.csv</label>
+      <input type="file" id="csvInput" accept=".csv,text/csv">
+      <div class="upload-hint">or drag and drop a CSV file here</div>
+      <div class="app-filename" id="fileNameLabel"></div>
+    </div>
+  </div>
+
+  <div class="app-card">
+    <details class="app-settings" id="settingsDetails">
+      <summary>Settings (colors, ignore words, already-processed orders)</summary>
+
+      <div class="app-row">
+        <label for="archiveCheckbox" style="font-weight:normal; display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="archiveCheckbox" checked>
+          Skip orders at/before the last-processed timestamp, and advance it after a run
+        </label>
+      </div>
+      <div class="app-row">
+        <span>Last processed order timestamp:</span>
+        <input type="text" id="lastProcessedInput" placeholder="YYYY-MM-DD HH:MM:SS" size="20">
+        <button class="app-btn" id="setLastProcessedBtn">Set</button>
+        <button class="app-btn" id="clearLastProcessedBtn">Clear</button>
+      </div>
+
+      <div class="settings-grid">
+        <div>
+          <label for="colorsBox">Recognized colors (one per line)</label>
+          <textarea id="colorsBox" spellcheck="false"></textarea>
+        </div>
+        <div>
+          <label for="ignoreBox">Ignore words (one per line)</label>
+          <textarea id="ignoreBox" spellcheck="false"></textarea>
+        </div>
+      </div>
+      <div class="app-row">
+        <button class="app-btn" id="saveSettingsBtn">Save settings</button>
+        <button class="app-btn" id="resetSettingsBtn">Reset to defaults</button>
+      </div>
+    </details>
+  </div>
+
+  <div id="messages"></div>
+
+  <div id="reportControls" style="display:none;">
+    <button class="app-btn primary" id="printBtn">Print / Save as PDF</button>
+    <button class="app-btn" id="downloadBtn">Download report as HTML</button>
+  </div>
+
+  <div id="report"></div>
+
+  <p class="app-footer-note">
+    Runs the same category/size/color matching rules as the desktop tool (see
+    product_naming_spec.md). If a product doesn't show up right, check Settings
+    for a missing color or a new collection keyword, or check the warnings above
+    the report.
+  </p>
+
+</div>
+
+<script>
+/* ==========================================================================
+   Core parsing/report logic -- ported line-for-line from the Python
+   reference (config.py, utility_modules/{helper,models,orderParser,
+   addonParser,orderItem,makeHtml}.py). Verified byte-for-byte against real
+   Shopify export data run through the original Python tool (only
+   difference: Python's list(set(...)) dedup order for multi-color variants
+   is not deterministic across runs to begin with -- this port uses a
+   first-seen-order Set instead, which is stable).
+   ========================================================================== */
+
+"use strict";
+
+const DEFAULT_COLORS = [
+  "barley", "beige", "big sky", "black", "camel", "caramel", "carob", "chai",
+  "chestnut", "cream", "daffodil", "dusty rose", "flax", "gray", "grey",
+  "honey", "iron", "latte", "lichen", "milk", "navy", "oat", "oyster",
+  "papaya", "pink", "platinum", "rhubarb", "rose blush", "russet", "rust",
+  "sable", "saddle", "sahara", "sepia", "sienna", "tan", "tumbleweed",
+  "white", "wood",
+];
+
+const DEFAULT_IGNORE_WORDS = [
+  "&", "//", "and", "baby", "bella", "booties", "color", "critters", "cute",
+  "daisy", "for", "headband", "jane", "janes", "leather", "loafer",
+  "loafers", "lotus", "mary", "mocc", "moccs", "pick", "rainey",
+  "removable", "rubber", "runner", "sandals", "scout", "sequoia", "shoe",
+  "shoes", "sole", "soles", "strap", "sunrise", "t", "the", "tone",
+  "toddler", "two", "on", "with", "designs",
+  "blossoms", "colors", "darker", "foot", "included", "insert", "length",
+  "measures", "men", "mens", "size", "wool", "women", "womens", "your",
+  "big", "kids",
+];
+
+function longestFirst(list) {
+  return [...list].map((s) => s.toLowerCase().trim()).filter(Boolean).sort((a, b) => b.length - a.length);
+}
+
+const AddonType = {
+  WOOL: "wool",
+  SOLE: "sole",
+  PURSE: "purse",
+  HEADBAND: "headband",
+  GIFT: "gift",
+  UNKNOWN: "unknown",
+};
+
+const CATEGORY_MAP = {
+  [AddonType.WOOL]: "Natural Wool Insert",
+  [AddonType.SOLE]: "Big Runner",
+  [AddonType.PURSE]: "Purse",
+  [AddonType.HEADBAND]: "Headband",
+  [AddonType.GIFT]: "Gift Card",
+  [AddonType.UNKNOWN]: "Unknown",
+};
+
+const CATEGORY = [
+  "Lotus", "T-strap", "RAINEY", "BELLA", "Blossoms", "Mary", "SEQ", "SUN",
+  "Daisy", "Moccs", "Two tone", "Loafer", "Designs", "Critters", "Scout",
+];
+
+const COLLECTION_NAME_WORDS = new Set([
+  "lotus", "t", "strap",
+  "rainey",
+  "bella",
+  "blossoms",
+  "mary", "jane", "janes",
+  "sequoia",
+  "sunrise",
+  "daisy",
+  "mocc", "moccs",
+  "two", "tone",
+  "loafer", "loafers",
+  "scout", "booties",
+]);
+
+const CATEGORY_DISPLAY_STRIP = {
+  "Lotus": new Set(["lotus"]),
+  "T-strap": new Set(["t", "strap"]),
+  "RAINEY": new Set(["rainey", "jane", "janes"]),
+  "BELLA": new Set(["bella", "jane", "janes"]),
+  "Blossoms": new Set(["blossoms"]),
+  "Mary": new Set(["mary", "jane", "janes"]),
+  "SEQ": new Set(["sequoia"]),
+  "SUN": new Set(["sunrise"]),
+  "Daisy": new Set(["daisy"]),
+  "Moccs": new Set(["mocc", "moccs"]),
+  "Two tone": new Set(["two", "tone"]),
+  "Loafer": new Set(["loafer", "loafers"]),
+  "Scout": new Set(["scout", "booties"]),
+};
+
+const ADD_MARKERS = [
+  { name: "WOOL", value: "natural wool insert" },
+  { name: "BIG_RUNNER", value: "big runner" },
+  { name: "PURSE", value: "purse" },
+  { name: "HEADBAND", value: "headband" },
+  { name: "GIFT", value: "gift card" },
+];
+
+const ICON_MAP = {
+  [AddonType.WOOL]: "🐑",
+  [AddonType.SOLE]: "👟",
+  [AddonType.PURSE]: "👜",
+  [AddonType.HEADBAND]: "🎀",
+  [AddonType.GIFT]: "💳",
+};
+
+const ADDON_TYPE_MAP = {
+  "natural wool insert": AddonType.WOOL,
+  "big runner": AddonType.SOLE,
+  "purse": AddonType.PURSE,
+  "headband": AddonType.HEADBAND,
+  "gift card": AddonType.GIFT,
+  "unknown": AddonType.UNKNOWN,
+};
+
+const IGNORE_LOCATION = [
+  "(bottom l)", "(bottom r)", "(top l)", "(top r)", "(middle)", "(left)", "(right)",
+];
+
+function makeParseEvent(level, message, orderNum, timestamp) {
+  return { level, message, order_num: orderNum ?? null, timestamp: timestamp ?? null };
+}
+
+function cleanTimestamp(ts) {
+  if (!ts) return "";
+  return ts.split(" -")[0].trim();
+}
+
+function timestampToDate(ts) {
+  const cleaned = cleanTimestamp(ts);
+  const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(cleaned);
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s] = m.map(Number);
+  const dt = new Date(Date.UTC(y, mo - 1, d, h, mi, s));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null;
+  return dt;
+}
+
+function formatTimestamp(dt) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())} ${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())}:${pad(dt.getUTCSeconds())}`;
+}
+
+function parseCsvText(text) {
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+  let i = 0;
+  const n = text.length;
+
+  const pushField = () => { row.push(field); field = ""; };
+  const pushRow = () => { pushField(); rows.push(row); row = []; };
+
+  while (i < n) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+        inQuotes = false; i += 1; continue;
+      }
+      field += c; i += 1; continue;
+    }
+    if (c === '"') { inQuotes = true; i += 1; continue; }
+    if (c === ",") { pushField(); i += 1; continue; }
+    if (c === "\r") { i += 1; continue; }
+    if (c === "\n") { pushRow(); i += 1; continue; }
+    field += c; i += 1;
+  }
+  if (field.length > 0 || row.length > 0) pushRow();
+
+  while (rows.length && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === "") {
+    rows.pop();
+  }
+
+  return rows;
+}
+
+function parseCsvToDict(text) {
+  const rows = parseCsvText(text);
+  if (!rows.length) return {};
+  const header = rows[0];
+  const dict = {};
+  for (const field of header) dict[field] = [];
+
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    for (let c = 0; c < header.length; c++) {
+      dict[header[c]].push(row[c] !== undefined ? row[c] : null);
+    }
+  }
+  return dict;
+}
+
+function getSizeAndPrefix(item, sizeStr) {
+  const re = /-\s*(?:(kids)|(wom[ae]ns?|m[ae]ns?|[WM]))?\s*(\d+(?:\.\d+)?)/i;
+  const m = re.exec(sizeStr);
+  if (m) {
+    const [, kidsPrefix, adultPrefix, sizeNumber] = m;
+    item.size = sizeNumber;
+    if (kidsPrefix) item.prefix = "Kids";
+    else if (adultPrefix) item.prefix = adultPrefix[0].toLowerCase() === "w" ? "W" : "M";
+    else item.prefix = null;
+    sizeStr = sizeStr.slice(0, m.index).trim();
+  }
+  return sizeStr;
+}
+
+function extractVarient(text, colors) {
+  const found = new Set();
+  let lower = text.toLowerCase();
+  for (const junk of IGNORE_LOCATION) lower = lower.split(junk).join("");
+  for (const color of colors) {
+    if (lower.includes(color)) found.add(lower);
+  }
+  return [...found];
+}
+
+function extractColors(text, colors) {
+  const found = new Set();
+  let lower = text.toLowerCase();
+  for (const junk of IGNORE_LOCATION) lower = lower.split(junk).join("");
+  for (const color of colors) {
+    if (lower.includes(color)) found.add(color);
+  }
+  return [...found];
+}
+
+function extractDisplayText(mainText, colors, category, gotColors, gotIgnore) {
+  const categoryWords = CATEGORY_DISPLAY_STRIP[category] || new Set();
+  let left = mainText;
+  left = left.split("//").join(" ");
+  left = left.replace(/'s\b/g, "");
+  left = left.replace(/\(.*?\)/g, "");
+
+  const words = left.match(/[A-Za-z]+/g) || [];
+  const filtered = [];
+
+  for (const word of words) {
+    const lower = word.toLowerCase();
+    if (COLLECTION_NAME_WORDS.has(lower)) {
+      if (categoryWords.has(lower)) continue;
+    } else if (gotIgnore.includes(lower)) {
+      continue;
+    }
+    if (colors && colors.length && gotColors.includes(lower)) continue;
+    filtered.push(word);
+  }
+
+  const seen = new Set();
+  const deduped = [];
+  for (const w of filtered) {
+    if (!seen.has(w)) { seen.add(w); deduped.push(w); }
+  }
+
+  let result = deduped.join(" ").trim();
+  if (colors && colors.length) {
+    result = `${colors.join(", ")} ${result}`;
+  }
+  return result.trim();
+}
+
+function parseOrderItemData(item, cfg) {
+  item.colors = [];
+  const parts = item.original_order_string.split(" / ");
+  let main = parts[0];
+  if (parts.length > 1) item.variant_full = parts[1].trim();
+
+  if (item.variant_full) {
+    const colorList = extractVarient(item.variant_full, cfg.colors);
+    if (colorList.length) item.colors = colorList;
+  }
+
+  if (!item.colors.length) {
+    item.colors = extractColors(item.original_order_string, cfg.colors);
+  }
+
+  main = getSizeAndPrefix(item, main);
+
+  for (const cat of CATEGORY) {
+    if (main.toLowerCase().includes(cat.toLowerCase())) { item.category = cat; break; }
+  }
+
+  item.display_text = extractDisplayText(main, item.colors, item.category, cfg.colors, cfg.ignoreWords);
+  item.product_name = main;
+  return item;
+}
+
+function getOrderItem(text, timeStamp, { quantity = null, note = null, orderNum = null } = {}, cfg) {
+  const order = newOrderItem({
+    time_stamp: timeStamp,
+    original_order_string: text,
+    quantity,
+    note,
+    order_num: orderNum,
+  });
+  return parseOrderItemData(order, cfg);
+}
+
+function titleCase(s) {
+  return s.replace(/\b\w+/g, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase());
+}
+
+function getColorEndHyphen(item) {
+  const parts = item.display_text.split(" - ");
+  return titleCase(parts[parts.length - 1].trim());
+}
+
+function extractBigRunnerColor(text) {
+  const m = /big runner/i.exec(text);
+  if (!m) return "None";
+  let color = text.slice(0, m.index).trim();
+  color = color.replace(/\s+leather\s*$/i, "").trim();
+  if (!color) return "None";
+  return titleCase(color);
+}
+
+function extractPurseColor(text) {
+  const m = /purse/i.exec(text);
+  if (!m) return "None";
+  let color = text.slice(0, m.index).trim();
+  color = color.replace(/\s+leather\s*$/i, "").trim();
+  if (!color) return "None";
+  return titleCase(color);
+}
+
+function classifyAddon(item) {
+  item.icon = ICON_MAP[item.add_type] || "❓";
+  item.category = CATEGORY_MAP[item.add_type] || CATEGORY_MAP[AddonType.UNKNOWN];
+
+  if (item.add_type === AddonType.WOOL) {
+    if (item.display_text.includes(" - ")) {
+      const parts = item.display_text.split(" - ");
+      item.size = titleCase(parts[parts.length - 1].trim());
+    }
+  } else if (item.add_type === AddonType.SOLE) {
+    if (item.display_text.includes(" - ")) item.color = getColorEndHyphen(item);
+    if (item.color === null) item.color = extractBigRunnerColor(item.display_text);
+  } else if (item.add_type === AddonType.HEADBAND) {
+    item.color = getColorEndHyphen(item);
+    item.icon = ICON_MAP[AddonType.HEADBAND];
+    item.size = "None";
+  } else if (item.add_type === AddonType.PURSE) {
+    item.color = extractPurseColor(item.display_text);
+    item.icon = ICON_MAP[AddonType.PURSE];
+    item.size = "None";
+    item.display_text = "";
+  } else if (item.add_type === AddonType.GIFT) {
+    item.color = "None";
+    item.size = "None";
+  } else {
+    item.icon = "➕";
+    item.add_type = AddonType.UNKNOWN;
+  }
+}
+
+function getAddOnItem(text, timeStamp, addType, { quantity = null, note = null, orderNum = null } = {}) {
+  const add = newAddon({
+    time_stamp: timeStamp,
+    original_order_string: text,
+    add_type: addType,
+    display_text: text,
+    quantity,
+    note,
+    order_num: orderNum,
+  });
+  classifyAddon(add);
+  return add;
+}
+
+function newAddon(fields) {
+  return {
+    kind: "Addon",
+    time_stamp: fields.time_stamp,
+    original_order_string: fields.original_order_string,
+    icon: fields.icon ?? null,
+    color: fields.color ?? null,
+    order_num: fields.order_num ?? null,
+    quantity: fields.quantity ?? 1,
+    note: fields.note ?? null,
+    display_text: fields.display_text ?? null,
+    product_name: fields.product_name ?? null,
+    category: fields.category ?? null,
+    size: fields.size ?? null,
+    prefix: fields.prefix ?? null,
+    add_type: fields.add_type ?? null,
+  };
+}
+
+function newOrderItem(fields) {
+  return {
+    kind: "OrderItem",
+    time_stamp: fields.time_stamp,
+    original_order_string: fields.original_order_string,
+    order_num: fields.order_num ?? null,
+    quantity: fields.quantity ?? 1,
+    note: fields.note ?? null,
+    display_text: fields.display_text ?? null,
+    product_name: fields.product_name ?? null,
+    category: fields.category ?? null,
+    size: fields.size ?? null,
+    prefix: fields.prefix ?? null,
+    addOns: [],
+    variant_full: fields.variant_full ?? null,
+    colors: fields.colors ?? [],
+  };
+}
+
+function addonGetDisplay(a) {
+  let ret = "";
+  if (a.note) ret += `📝 ${a.note}\n`;
+  if (a.icon) ret += a.icon;
+  if (a.color) ret += `(${a.color})`;
+  if (a.display_text !== null && a.display_text !== undefined) ret += a.display_text;
+  else if (a.product_name) ret += a.product_name;
+  else if (a.original_order_string) ret += a.original_order_string;
+  return ret;
+}
+
+function addonGetOrderPiggybackDisplay(a) {
+  let ret = "";
+  if (a.note) ret += "📝";
+  if (a.icon) ret += a.icon;
+  if (a.color) ret += `(${a.color})`;
+  return ret;
+}
+
+function orderGetDisplay(o) {
+  let ret = "";
+  if (o.note) ret += "📝";
+  if (o.display_text !== null && o.display_text !== undefined) ret += o.display_text;
+  else if (o.product_name) ret += o.product_name;
+  else if (o.original_order_string) ret += o.original_order_string;
+  return ret;
+}
+
+function orderGetToolTip(o, addOns) {
+  const parts = [];
+  parts.push(`Order ${o.order_num}`);
+  parts.push(o.original_order_string);
+  parts.push(o.note || "");
+  for (const add of addOns || []) parts.push(addonGetDisplay(add));
+  return parts.join("\n").trim().split('"').join("&quot;");
+}
+
+function newBatch() {
+  return {
+    addOns_list: [],
+    orders_list: [],
+    orderItems: new Map(),
+    orderAddons: new Map(),
+  };
+}
+
+function batchRebuild(batch) {
+  const groupedOrders = new Map();
+  const groupedAddons = new Map();
+  for (const item of batch.orders_list) {
+    if (!groupedOrders.has(item.order_num)) groupedOrders.set(item.order_num, []);
+    groupedOrders.get(item.order_num).push(item);
+  }
+  batch.orderItems = groupedOrders;
+  for (const item of batch.addOns_list) {
+    if (!groupedAddons.has(item.order_num)) groupedAddons.set(item.order_num, []);
+    groupedAddons.get(item.order_num).push(item);
+  }
+  batch.orderAddons = groupedAddons;
+}
+
+function batchAddOrder(batch, order) { batch.orders_list.push(order); }
+function batchAddAddOn(batch, addon) { batch.addOns_list.push(addon); }
+function batchGetOrderItem(batch, orderNum) { return batch.orderItems.get(orderNum) || []; }
+function batchGetOrderAddonItems(batch, orderNum) { return batch.orderAddons.get(orderNum) || []; }
+function batchGetAllOrderItems(batch) { return [...batch.orderItems.values()].flat(); }
+function batchGetAllAddonItems(batch) { return [...batch.orderAddons.values()].flat(); }
+
+function batchGetHeaders(batch) {
+  const seen = new Map();
+  for (const item of batchGetAllOrderItems(batch)) {
+    if (!seen.has(item.category)) seen.set(item.category, 1);
+  }
+  return [...seen.keys()];
+}
+
+function batchGetOrderCategory(batch, category) {
+  const orders = [];
+  for (const items of batch.orderItems.values()) {
+    for (const item of items) if (item.category === category) orders.push(item);
+  }
+  return orders;
+}
+
+function batchGetTryBigRunnerSize(batch) {
+  const events = [];
+  const orderNums = [...batch.orderItems.keys()];
+  for (const orderNum of orderNums) {
+    const addOns = batchGetOrderAddonItems(batch, orderNum);
+    const orderItems = batchGetOrderItem(batch, orderNum);
+    let note = null;
+    for (const order of orderItems) if (order.note) note = order.note;
+
+    let totalBlack = 0;
+    let totalTan = 0;
+    for (const add of addOns) {
+      if (!add.note && note !== null) add.note = note;
+      if (add.add_type === AddonType.SOLE) {
+        if ((add.color || "").toLowerCase() === "tan") totalTan += add.quantity;
+        if ((add.color || "").toLowerCase() === "black") totalBlack += add.quantity;
+      }
+    }
+    const totalRunners = totalBlack + totalTan;
+
+    if (orderItems.length === totalRunners) {
+      if (totalBlack === 0 || totalTan === 0) {
+        const sizeList = orderItems.map((o) => o.size);
+        let idx = 0;
+        for (const add of addOns) {
+          if (add.add_type === AddonType.SOLE) { add.size = sizeList[idx]; idx += 1; }
+        }
+      }
+    } else if (totalRunners > 0) {
+      events.push(makeParseEvent(1, "Could not determine big runner size automatically -- please set manually", orderNum));
+    }
+  }
+  return events;
+}
+
+function batchGetAddonCategorized(batch) {
+  const addOns = batchGetAllAddonItems(batch);
+  const addonRows = {};
+  const events = batchGetTryBigRunnerSize(batch);
+
+  for (const add of addOns) {
+    if (add.add_type === AddonType.GIFT) continue;
+    const key = add.add_type === AddonType.SOLE ? `${add.category} ${add.color}` : add.category;
+    (addonRows[key] ??= []).push(add);
+  }
+  return [addonRows, events];
+}
+
+const COLOR_REQUIRED_ADDON_TYPES = new Set([AddonType.SOLE, AddonType.PURSE, AddonType.HEADBAND]);
+
+function getClass(text, timeStamp, opts, cfg) {
+  const lower = (text || "").toLowerCase();
+  for (const marker of ADD_MARKERS) {
+    let matched;
+    if (marker.name === "WOOL") {
+      matched = lower.includes("wool insert") && !lower.includes("wool insert included");
+    } else {
+      matched = lower.includes(marker.value);
+    }
+    if (matched) {
+      return getAddOnItem(text, timeStamp, ADDON_TYPE_MAP[marker.value] ?? AddonType.UNKNOWN, opts);
+    }
+  }
+  return getOrderItem(text, timeStamp, opts, cfg);
+}
+
+function parseOrders({ orderStrings, timestamps, quantities, notes, orderNums, archive = false, lastProcessed = null }, cfg) {
+  const batch = newBatch();
+  const events = [];
+  let newestTimestamp = null;
+
+  for (let i = 0; i < orderStrings.length; i++) {
+    const text = orderStrings[i];
+    const rowOrderNumRaw = orderNums ? orderNums[i] : null;
+
+    try {
+      const ts = timestamps ? (timestamps[i] || "") : "";
+
+      if (!text || !text.trim()) {
+        events.push(makeParseEvent(1, "Skipping row with blank Lineitem name", rowOrderNumRaw, ts));
+        continue;
+      }
+
+      let orderNum = null;
+      if (orderNums && rowOrderNumRaw && rowOrderNumRaw.startsWith("#")) {
+        orderNum = rowOrderNumRaw.slice(1);
+      }
+
+      const quantityRaw = quantities ? quantities[i] : null;
+      let quantity;
+      const qNum = quantityRaw ? parseInt(quantityRaw, 10) : NaN;
+      if (quantityRaw && Number.isFinite(qNum) && /^-?\d+$/.test(String(quantityRaw).trim())) {
+        quantity = qNum;
+      } else if (!quantityRaw) {
+        quantity = 1;
+      } else {
+        events.push(makeParseEvent(1, `Non-numeric quantity ${JSON.stringify(quantityRaw)}, defaulting to 1`, rowOrderNumRaw, ts));
+        quantity = 1;
+      }
+
+      const note = notes ? notes[i] : null;
+
+      if (ts && archive) {
+        const currentDt = timestampToDate(ts);
+        if (currentDt === null) {
+          events.push(makeParseEvent(2, `Could not parse timestamp: ${JSON.stringify(ts)}`, rowOrderNumRaw, ts));
+        } else {
+          if (lastProcessed && currentDt <= lastProcessed) {
+            events.push(makeParseEvent(1, `Skipping already processed order: ${ts}`, rowOrderNumRaw, ts));
+            continue;
+          }
+          if (newestTimestamp === null || currentDt > newestTimestamp) newestTimestamp = currentDt;
+        }
+      }
+
+      const item = getClass(text, ts, { quantity, note, orderNum }, cfg);
+
+      if (item.kind === "Addon") {
+        batchAddAddOn(batch, item);
+        if (COLOR_REQUIRED_ADDON_TYPES.has(item.add_type) && (item.color === null || item.color === "None")) {
+          events.push(makeParseEvent(1, `Could not determine a color for this add-on -- check for a new/unrecognized product format: ${JSON.stringify(text)}`, rowOrderNumRaw, ts));
+        }
+      } else {
+        batchAddOrder(batch, item);
+        if (item.category === null) {
+          events.push(makeParseEvent(1, `Could not match a category for this product -- check for a new/unrecognized collection name: ${JSON.stringify(text)}`, rowOrderNumRaw, ts));
+        }
+        if (item.size === null) {
+          events.push(makeParseEvent(1, `Could not determine a size for this product -- check for a new/unrecognized size format: ${JSON.stringify(text)}`, rowOrderNumRaw, ts));
+        }
+      }
+    } catch (exc) {
+      events.push(makeParseEvent(2, `Skipping row due to unexpected error: ${exc.message || exc}`, rowOrderNumRaw, timestamps ? timestamps[i] : null));
+      continue;
+    }
+  }
+
+  batchRebuild(batch);
+
+  let newLastProcessed = lastProcessed;
+  if (archive && newestTimestamp) newLastProcessed = newestTimestamp;
+
+  return { batch, events, newLastProcessed };
+}
+
+class Divider {
+  constructor(label) { this.label = label; }
+}
+
+class Table {
+  constructor(title, columns, rows = []) {
+    this.title = title;
+    this.columns = columns;
+    this.rows = rows;
+    this.tier_label = undefined;
+  }
+  add(row) { this.rows.push(row); }
+  addDivider(label) { this.rows.push(new Divider(label)); }
+}
+
+class Report {
+  constructor(title = "", maxRows = 18) {
+    this.title = title;
+    this.maxRows = maxRows;
+    this.tables = [];
+  }
+  add(table) { this.tables.push(table); }
+
+  chop(table) {
+    if (table.rows.length <= this.maxRows) return [table];
+    const numChunks = Math.ceil(table.rows.length / this.maxRows);
+    const chunkSize = Math.ceil(table.rows.length / numChunks);
+    const out = [];
+    for (let i = 0; i < table.rows.length; i += chunkSize) {
+      out.push(new Table(table.title, table.columns, table.rows.slice(i, i + chunkSize)));
+    }
+    return out;
+  }
+
+  make(maxTables = 5) {
+    let parsed = [];
+    for (const table of this.tables) {
+      if (table.rows.length) parsed = parsed.concat(this.chop(table));
+    }
+    return this.getGridOfTables(parsed, maxTables);
+  }
+
+  makeHtmlTable(table) {
+    const html = [`<h1 class="table-title">${table.title}</h1>`, "<table>", "<tr>"];
+    for (const column of table.columns) html.push(`<th>${column}</th>`);
+    html.push("</tr>");
+    for (const row of table.rows) {
+      if (row instanceof Divider) {
+        html.push(`<tr class="size-group-row"><td class="size-group" colspan="${table.columns.length}">${row.label}</td></tr>`);
+        continue;
+      }
+      html.push("<tr>");
+      for (const value of row) html.push(`<td>${value}</td>`);
+      html.push("</tr>");
+    }
+    html.push("</table>");
+    return html.join("");
+  }
+
+  getGridOfTables(tables, maxTables) {
+    if (!tables.length) return "";
+    const columnCount = Math.max(1, Math.min(maxTables, tables.length));
+    const html = [`<div class="table-columns" style="column-count:${columnCount};">`];
+    for (const table of tables) html.push(`<div class="table-block">${this.makeHtmlTable(table)}</div>`);
+    html.push("</div>");
+    html.push('<div class="page-break"></div>');
+    return html.join("");
+  }
+
+  makeFlat() {
+    const tablesWithRows = this.tables.filter((t) => t.rows.length);
+    if (!tablesWithRows.length) return "";
+    const columns = tablesWithRows[0].columns;
+    const colgroup = "<colgroup>" + columns.map((_, idx) => `<col class="col-${idx}">`).join("") + "</colgroup>";
+    const html = [];
+    for (const table of tablesWithRows) {
+      for (const tierTable of Report.splitByTier(table)) {
+        html.push(Report.makeFlatTableHtml(tierTable, colgroup, columns));
+      }
+    }
+    html.push('<div class="page-break"></div>');
+    return html.join("");
+  }
+
+  static splitByTier(table) {
+    const segments = [];
+    let currentLabel = null;
+    let currentRows = [];
+    const flush = () => {
+      if (currentRows.length) {
+        const seg = new Table(table.title, table.columns, [...currentRows]);
+        seg.tier_label = currentLabel;
+        segments.push(seg);
+      }
+    };
+    for (const row of table.rows) {
+      if (row instanceof Divider) {
+        flush();
+        currentRows = [];
+        currentLabel = row.label;
+        continue;
+      }
+      currentRows.push(row);
+    }
+    flush();
+    if (!segments.length) {
+      table.tier_label = null;
+      segments.push(table);
+    }
+    return segments;
+  }
+
+  static makeFlatTableHtml(table, colgroup, columns) {
+    const subtitle = table.tier_label;
+    const html = ['<table class="flat-table">', colgroup, "<thead>"];
+    html.push(`<tr class="category-group-row"><td class="category-group" colspan="${columns.length}">${table.title}</td></tr>`);
+    if (subtitle) {
+      html.push(`<tr class="size-group-row"><td class="size-group" colspan="${columns.length}">${subtitle}</td></tr>`);
+    }
+    html.push("<tr>");
+    for (const column of columns) html.push(`<th>${column}</th>`);
+    html.push("</tr>");
+    html.push("</thead>");
+    html.push("<tbody>");
+    for (const row of table.rows) {
+      html.push("<tr>");
+      for (const value of row) html.push(`<td>${value}</td>`);
+      html.push("</tr>");
+    }
+    html.push("</tbody>");
+    html.push("</table>");
+    return html.join("");
+  }
+}
+
+const SIZE_TIERS = {
+  "__none__": [0, "Toddler"],
+  "Kids": [1, "Big Kids"],
+  "M": [2, "Men's"],
+  "W": [3, "Women's"],
+};
+const ALWAYS_LABEL_TIERS = new Set([1, 2, 3]);
+
+function shouldShowDivider(tier, lastTier, tiersPresent) {
+  if (tier === lastTier) return false;
+  return tiersPresent.size > 1 || ALWAYS_LABEL_TIERS.has(tier);
+}
+
+function getSizeTier(item) {
+  if (!item.size) return [99, null, null];
+  const size = String(item.size).trim();
+  const explicitPrefix = item.prefix;
+
+  if (explicitPrefix) {
+    const numberMatch = /^(\d+(?:\.\d+)?)$/.exec(size);
+    const number = numberMatch ? parseFloat(numberMatch[1]) : null;
+    const [tier, label] = SIZE_TIERS[explicitPrefix] || [99, null];
+    return [tier, label, number];
+  }
+
+  const match = /^(?:(kids)|(wom[ae]ns?|m[ae]ns?|[WM]))?\s*(\d+(?:\.\d+)?)$/i.exec(size);
+  if (!match) return [99, null, null];
+
+  const [, kidsPrefix, adultPrefix, number] = match;
+  let prefix = "__none__";
+  if (kidsPrefix) prefix = "Kids";
+  else if (adultPrefix) prefix = adultPrefix[0].toLowerCase() === "w" ? "W" : "M";
+
+  const [tier, label] = SIZE_TIERS[prefix] || [99, null];
+  return [tier, label, parseFloat(number)];
+}
+
+function sortSize(item) {
+  const [tier, , number] = getSizeTier(item);
+  if (number === null) return [99, 999];
+  return [tier, number];
+}
+
+function sortKey(items, keyFn) {
+  return [...items].sort((a, b) => {
+    const ka = keyFn(a), kb = keyFn(b);
+    for (let i = 0; i < ka.length; i++) {
+      if (ka[i] < kb[i]) return -1;
+      if (ka[i] > kb[i]) return 1;
+    }
+    return 0;
+  });
+}
+
+function buildMainTableHtml(batch) {
+  const report = new Report("Shoes", 13);
+  const headers = batchGetHeaders(batch);
+  for (const header of headers) {
+    const catOrders = batchGetOrderCategory(batch, header);
+    if (!catOrders.length) continue;
+
+    const table = new Table(header, ["Size", "Description", "Order Details"]);
+    const sortedOrders = sortKey(catOrders, sortSize);
+    const tiersPresent = new Set(sortedOrders.map((o) => getSizeTier(o)[0]));
+    let lastTier = null;
+
+    for (const order of sortedOrders) {
+      const [tier, label] = getSizeTier(order);
+      if (shouldShowDivider(tier, lastTier, tiersPresent)) {
+        table.addDivider(label || "Other");
+        lastTier = tier;
+      }
+
+      const size = order.size;
+      let display = orderGetDisplay(order);
+      const addOns = batchGetOrderAddonItems(batch, order.order_num);
+      const piggybackTypes = new Set([AddonType.WOOL, AddonType.SOLE]);
+
+      for (const add of addOns) {
+        if (piggybackTypes.has(add.add_type)) {
+          display = `${addonGetOrderPiggybackDisplay(add)}${display}`;
+        }
+      }
+
+      const tooltip = orderGetToolTip(order, addOns).split(/\s+/).filter(Boolean).join(" ");
+
+      const sizeHtml = `\n                     <button class="order " ">\n                        ${size}\n                    </button>\n                `;
+      const displayHtml = `<span class="display-text">${display}</span>`;
+      const detailsHtml = `<span class="order-details">${tooltip}</span>`;
+
+      table.add([sizeHtml, displayHtml, detailsHtml]);
+    }
+
+    report.add(table);
+  }
+  return report;
+}
+
+function getDateRange(orders) {
+  const timestamps = orders.map((o) => o.time_stamp).filter(Boolean);
+  if (!timestamps.length) return "";
+  const cleaned = timestamps.map(cleanTimestamp);
+  const start = cleaned.reduce((a, b) => (a < b ? a : b));
+  const end = cleaned.reduce((a, b) => (a > b ? a : b));
+  return `${start} - ${end}`;
+}
+
+function getAddOnReport(batch) {
+  const [addOnsDict, events] = batchGetAddonCategorized(batch);
+  const addReport = new Report("", 15);
+  for (const addKey of Object.keys(addOnsDict)) {
+    const addList = addOnsDict[addKey];
+    const columns = ["Order Number", "Size", "Description"];
+    const sortedAdds = sortKey(addList, sortSize);
+    const tiersPresent = new Set(sortedAdds.map((a) => getSizeTier(a)[0]));
+    let lastTier = null;
+
+    const table = new Table(addKey, columns);
+    for (const add of sortedAdds) {
+      const [tier, label] = getSizeTier(add);
+      if (shouldShowDivider(tier, lastTier, tiersPresent)) {
+        table.addDivider(label || "Other");
+        lastTier = tier;
+      }
+      const size = add.size ? add.size : 999;
+      table.add([add.order_num, size, addonGetDisplay(add)]);
+    }
+    addReport.add(table);
+  }
+  return [addReport, events];
+}
+
+function bottomSizeLabel(order) {
+  if (!order.size) return "Unknown";
+  const [tier, tierLabel] = getSizeTier(order);
+  if (tierLabel && tier !== 0) return `${tierLabel} ${order.size}`;
+  return String(order.size);
+}
+
+function getBottomsReport(orders) {
+  const counts = {};
+  const sampleForLabel = {};
+  for (const order of orders) {
+    const label = bottomSizeLabel(order);
+    counts[label] = (counts[label] || 0) + (order.quantity || 0);
+    if (!(label in sampleForLabel)) sampleForLabel[label] = order;
+  }
+  const table = new Table("Bottoms", ["Size", "Qty"]);
+  const sortedLabels = Object.keys(counts).sort((a, b) => {
+    const ka = sortSize(sampleForLabel[a]), kb = sortSize(sampleForLabel[b]);
+    for (let i = 0; i < ka.length; i++) {
+      if (ka[i] < kb[i]) return -1;
+      if (ka[i] > kb[i]) return 1;
+    }
+    return 0;
+  });
+  let total = 0;
+  for (const label of sortedLabels) {
+    const qty = counts[label];
+    total += qty;
+    table.add([label, qty]);
+  }
+  table.add(["<b>Total</b>", `<b>${total}</b>`]);
+  const report = new Report();
+  report.add(table);
+  return report;
+}
+
+function getLeatherOrder(orders) {
+  const small = {}, kid = {}, adult = {};
+  const prefixes = new Set(["M", "W", "Kids"]);
+  for (const order of orders) {
+    if (prefixes.has(order.prefix)) {
+      if (order.prefix === "M" || order.prefix === "W") {
+        for (const color of order.colors) adult[color] = (adult[color] || 0) + order.quantity;
+      }
+      if (order.prefix === "Kids") {
+        for (const color of order.colors) kid[color] = (kid[color] || 0) + order.quantity;
+      }
+    } else {
+      for (const color of order.colors) small[color] = (small[color] || 0) + order.quantity;
+    }
+  }
+  const report = new Report();
+  const toddlerTable = new Table("Toddler", ["Color", "Qty"]);
+  const kidsTable = new Table("Kids", ["Color", "Qty"]);
+  const adultTable = new Table("Adult", ["Color", "Qty"]);
+  for (const color of Object.keys(small)) toddlerTable.add([color, small[color]]);
+  for (const color of Object.keys(kid)) kidsTable.add([color, kid[color]]);
+  for (const color of Object.keys(adult)) adultTable.add([color, adult[color]]);
+  report.add(toddlerTable);
+  report.add(kidsTable);
+  report.add(adultTable);
+  return report;
+}
+
+/* ==========================================================================
+   The click-to-cycle-color progress marker on each order's size button
+   (none -> yellow -> green -> red -> gray) -- ported verbatim from
+   get_preamble()'s inline <script> in the Python original.
+   ========================================================================== */
+
+function wireOrderColorCycle(container) {
+  const colors = ["", "yellow", "green", "red", "gray"];
+  container.addEventListener("click", function (e) {
+    const order = e.target.closest(".order");
+    if (!order) return;
+    let index = parseInt(order.dataset.color || "0", 10);
+    order.classList.remove("red", "gray", "green", "yellow");
+    index = (index + 1) % colors.length;
+    if (colors[index]) order.classList.add(colors[index]);
+    order.dataset.color = index;
+  });
+}
+
+/* ==========================================================================
+   App wiring: settings persistence, CSV load, report render, print/download.
+   ========================================================================== */
+
+const REQUIRED_CSV_COLUMNS = ["Lineitem name", "Created at", "Lineitem quantity", "Notes", "Name"];
+const LS_COLORS = "sk_colors";
+const LS_IGNORE = "sk_ignore_words";
+const LS_LAST_PROCESSED = "sk_last_processed";
+
+function loadListSetting(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback.slice();
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length) return parsed;
+    return fallback.slice();
+  } catch (e) {
+    return fallback.slice();
+  }
+}
+
+function saveListSetting(key, list) {
+  try { localStorage.setItem(key, JSON.stringify(list)); } catch (e) { /* ignore */ }
+}
+
+function textareaToList(text) {
+  return text.split("\n").map((s) => s.trim()).filter(Boolean);
+}
+
+const colorsBox = document.getElementById("colorsBox");
+const ignoreBox = document.getElementById("ignoreBox");
+const csvInput = document.getElementById("csvInput");
+const uploadArea = document.getElementById("uploadArea");
+const fileNameLabel = document.getElementById("fileNameLabel");
+const messagesEl = document.getElementById("messages");
+const reportEl = document.getElementById("report");
+const reportControls = document.getElementById("reportControls");
+const archiveCheckbox = document.getElementById("archiveCheckbox");
+const lastProcessedInput = document.getElementById("lastProcessedInput");
+
+let currentColors = loadListSetting(LS_COLORS, DEFAULT_COLORS);
+let currentIgnoreWords = loadListSetting(LS_IGNORE, DEFAULT_IGNORE_WORDS);
+colorsBox.value = currentColors.join("\n");
+ignoreBox.value = currentIgnoreWords.join("\n");
+
+try {
+  const savedLp = localStorage.getItem(LS_LAST_PROCESSED);
+  if (savedLp) lastProcessedInput.value = savedLp;
+} catch (e) { /* ignore */ }
+
+document.getElementById("saveSettingsBtn").addEventListener("click", () => {
+  currentColors = textareaToList(colorsBox.value);
+  currentIgnoreWords = textareaToList(ignoreBox.value);
+  saveListSetting(LS_COLORS, currentColors);
+  saveListSetting(LS_IGNORE, currentIgnoreWords);
+  showMessage({ level: 0, message: "Settings saved." });
+});
+
+document.getElementById("resetSettingsBtn").addEventListener("click", () => {
+  currentColors = DEFAULT_COLORS.slice();
+  currentIgnoreWords = DEFAULT_IGNORE_WORDS.slice();
+  colorsBox.value = currentColors.join("\n");
+  ignoreBox.value = currentIgnoreWords.join("\n");
+  saveListSetting(LS_COLORS, currentColors);
+  saveListSetting(LS_IGNORE, currentIgnoreWords);
+  showMessage({ level: 0, message: "Colors and ignore words reset to defaults." });
+});
+
+document.getElementById("setLastProcessedBtn").addEventListener("click", () => {
+  const val = lastProcessedInput.value.trim();
+  if (!val) { showMessage({ level: 1, message: "Timestamp is empty." }); return; }
+  const dt = timestampToDate(val);
+  if (!dt) {
+    showMessage({ level: 3, message: "Invalid timestamp format. Expected: YYYY-MM-DD HH:MM:SS" });
+    return;
+  }
+  const cleaned = formatTimestamp(dt);
+  lastProcessedInput.value = cleaned;
+  try { localStorage.setItem(LS_LAST_PROCESSED, cleaned); } catch (e) {}
+  showMessage({ level: 0, message: `Set last processed timestamp to ${cleaned}` });
+});
+
+document.getElementById("clearLastProcessedBtn").addEventListener("click", () => {
+  lastProcessedInput.value = "";
+  try { localStorage.removeItem(LS_LAST_PROCESSED); } catch (e) {}
+  showMessage({ level: 0, message: "Timestamp cleared." });
+});
+
+function showMessage({ level, message, order_num }) {
+  const div = document.createElement("div");
+  const cls = level >= 2 ? "error" : level === 1 ? "warn" : "info";
+  div.className = `msg ${cls}`;
+  div.textContent = order_num ? `${order_num} - ${message}` : message;
+  messagesEl.appendChild(div);
+}
+
+function clearMessages() { messagesEl.innerHTML = ""; }
+
+["dragenter", "dragover"].forEach((evt) => {
+  uploadArea.addEventListener(evt, (e) => { e.preventDefault(); uploadArea.classList.add("dragover"); });
+});
+["dragleave", "drop"].forEach((evt) => {
+  uploadArea.addEventListener(evt, (e) => { e.preventDefault(); uploadArea.classList.remove("dragover"); });
+});
+uploadArea.addEventListener("drop", (e) => {
+  const file = e.dataTransfer.files && e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+csvInput.addEventListener("change", () => {
+  if (csvInput.files && csvInput.files[0]) handleFile(csvInput.files[0]);
+});
+
+let reportCssAndScript = null; // filled in from the page's own <style>/<script> for the download export
+
+function handleFile(file) {
+  fileNameLabel.textContent = `Loaded: ${file.name}`;
+  const reader = new FileReader();
+  reader.onload = () => processCsv(String(reader.result));
+  reader.onerror = () => showMessage({ level: 3, message: `Could not read file: ${file.name}` });
+  reader.readAsText(file);
+}
+
+function processCsv(text) {
+  clearMessages();
+  reportEl.innerHTML = "";
+  reportControls.style.display = "none";
+
+  const tree = parseCsvToDict(text);
+  if (!Object.keys(tree).length) {
+    showMessage({ level: 3, message: "CSV parsing failed -- the file appears empty or unreadable." });
+    return;
+  }
+
+  const missing = REQUIRED_CSV_COLUMNS.filter((c) => !(c in tree));
+  if (missing.length) {
+    showMessage({ level: 3, message: `CSV is missing required column(s): ${missing.join(", ")}` });
+    return;
+  }
+
+  const cfg = {
+    colors: longestFirst(currentColors),
+    ignoreWords: longestFirst(currentIgnoreWords),
+  };
+
+  const archive = archiveCheckbox.checked;
+  let lastProcessed = null;
+  if (archive && lastProcessedInput.value.trim()) {
+    lastProcessed = timestampToDate(lastProcessedInput.value.trim());
+  }
+
+  const { batch, events, newLastProcessed } = parseOrders({
+    orderStrings: tree["Lineitem name"],
+    timestamps: tree["Created at"],
+    quantities: tree["Lineitem quantity"],
+    notes: tree["Notes"],
+    orderNums: tree["Name"],
+    archive,
+    lastProcessed,
+  }, cfg);
+
+  for (const e of events) showMessage(e);
+
+  const orders = batchGetAllOrderItems(batch);
+  const dateRangeText = getDateRange(orders);
+
+  const mainTableHtml = buildMainTableHtml(batch).makeFlat();
+  const bottomsHtml = getBottomsReport(orders).make(2);
+  const leatherHtml = getLeatherOrder(orders).make(3);
+  const [addReportObj, addonEvents] = getAddOnReport(batch);
+  for (const e of addonEvents) showMessage(e);
+  const addonHtml = addReportObj.make(2);
+
+  const bodyHtml =
+    `<h1>Order Summary ${dateRangeText}</h1>` +
+    mainTableHtml +
+    `<h2>Bottoms</h2>` + bottomsHtml +
+    `<h2>Leather Order</h2>` + leatherHtml +
+    addonHtml;
+
+  reportEl.innerHTML = bodyHtml;
+  wireOrderColorCycle(reportEl);
+  reportControls.style.display = orders.length || batchGetAllAddonItems(batch).length ? "flex" : "none";
+
+  if (archive && newLastProcessed) {
+    const formatted = formatTimestamp(newLastProcessed);
+    lastProcessedInput.value = formatted;
+    try { localStorage.setItem(LS_LAST_PROCESSED, formatted); } catch (e) {}
+  } else if (!archive) {
+    showMessage({ level: 1, message: "Archive is unchecked -- not skipping already-processed orders or advancing the timestamp." });
+  }
+
+  if (!orders.length && !batchGetAllAddonItems(batch).length) {
+    showMessage({ level: 1, message: "No rows produced a shoe or add-on item -- check the file and Settings." });
+  }
+}
+
+document.getElementById("printBtn").addEventListener("click", () => window.print());
+
+document.getElementById("downloadBtn").addEventListener("click", () => {
+  const reportCss = document.querySelector("style").textContent;
+  const reportScript = `
+    (function(){
+      var colors = ["", "yellow", "green", "red", "gray"];
+      document.addEventListener("click", function(e){
+        var order = e.target.closest(".order");
+        if (!order) return;
+        var index = parseInt(order.dataset.color || "0", 10);
+        order.classList.remove("red","gray","green","yellow");
+        index = (index + 1) % colors.length;
+        if (colors[index]) order.classList.add(colors[index]);
+        order.dataset.color = index;
+      });
+    })();
+  `;
+  const standalone = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Orders</title>` +
+    `<style>${reportCss}</style></head><body>` +
+    `<div id="report">${reportEl.innerHTML}</div>` +
+    `<script>${reportScript}<\/script>` +
+    `</body></html>`;
+  const blob = new Blob([standalone], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "orders.html";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
