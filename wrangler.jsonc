@@ -1,0 +1,14 @@
+{
+  // Cloudflare Workers config for a pure static-asset deployment (no
+  // server-side Worker script -- this is just index.html + friends).
+  // See https://developers.cloudflare.com/workers/static-assets/
+  "name": "starryknightwebparser",
+  "compatibility_date": "2026-08-28",
+  "assets": {
+    "directory": "./",
+    // No index.html rewrite is configured here on purpose -- Cloudflare's
+    // static-assets serving already serves index.html for "/" and for any
+    // directory request by default, matching classic Pages behavior.
+    "not_found_handling": "404-page"
+  }
+}
