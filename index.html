@@ -324,6 +324,16 @@ details.app-settings summary {
     #report .page-break { break-before: page; page-break-before: always; }
     #report tr { page-break-inside: avoid; }
     #report li:hover { background-color: transparent; }
+
+    /* Browsers suppress background colors when printing by default (to
+       save ink) unless a page explicitly opts out -- without this, the
+       whole point of the click-to-cycle status color on each size button
+       (flag an order that needs attention) silently vanishes on the
+       printed/PDF cut sheet, the one place it matters most. */
+    #report .order {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
 }
 
 </style>
