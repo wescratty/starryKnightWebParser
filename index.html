@@ -976,26 +976,37 @@ function batchGetTryBigRunnerSize(batch) {
     }
     const totalRunners = totalBlack + totalTan;
 
-    if (orderItems.length === totalRunners) {
+    // Wes: compare against the total number of *pairs of shoes* ordered
+    // (each shoe item's own quantity, e.g. a Lineitem quantity of 2 on one
+    // row), not just the number of distinct shoe rows/objects -- a single
+    // row with quantity 2 needs 2 runner soles matched to it, same as two
+    // separate quantity-1 rows would.
+    const sizeList = [];
+    for (const o of orderItems) {
+      const q = o.quantity && o.quantity > 0 ? o.quantity : 1;
+      for (let k = 0; k < q; k++) sizeList.push(o.size);
+    }
+    const totalShoeQty = sizeList.length;
+
+    if (totalShoeQty === totalRunners) {
       if (totalBlack === 0 || totalTan === 0) {
-        const sizeList = orderItems.map((o) => o.size);
         let idx = 0;
         for (const add of addOns) {
           if (add.add_type === AddonType.SOLE) { add.size = sizeList[idx]; idx += 1; }
         }
       }
     } else if (totalRunners > 0) {
-      // Wes: this only auto-assigns when the count of shoe line-items in
+      // Wes: this only auto-assigns when the total quantity of shoes in
       // the order exactly matches the total quantity of same-colored Big
       // Runner add-ons for that order (see the `if` above) -- it can't
       // safely guess which shoe gets which sole size otherwise. Spelling
       // out the actual counts here (rather than a bare "couldn't
       // determine") makes it possible to tell, from the message alone,
       // whether that's a real ambiguous case or just a Big Runner
-      // add-on's own Lineitem quantity not being 1 as expected.
+      // add-on's own Lineitem quantity not matching the shoe's.
       events.push(makeParseEvent(
         1,
-        `Could not determine big runner size automatically (${orderItems.length} shoe item(s), ` +
+        `Could not determine big runner size automatically (${totalShoeQty} shoe(s), ` +
           `${totalTan} tan / ${totalBlack} black runner sole(s)) -- please set manually`,
         orderNum
       ));
