@@ -289,6 +289,14 @@ details.app-settings summary {
     margin: 0;
 }
 
+/* Quantity flag on order items and add-ons (only rendered when qty > 1) --
+   bold and a bit larger so a multi-quantity line doesn't get missed at the
+   9px base size of the Order Details text. */
+#report .qty-flag {
+    font-weight: bold;
+    font-size: 1.3em;
+}
+
 #report .table-columns {
     column-gap: 20px;
     column-fill: auto;
@@ -849,6 +857,9 @@ function addonGetDisplay(a) {
   if (a.note) ret += `📝 ${a.note}\n`;
   if (a.icon) ret += a.icon;
   if (a.color) ret += `(${a.color})`;
+  // Wes: same "only show if more than 1" quantity flag as order items,
+  // applied to add-ons too (e.g. 2x of the same wool insert).
+  if (a.quantity && a.quantity > 1) ret += `<b class='qty-flag'>(Qty ${a.quantity})</b>`;
   if (a.display_text !== null && a.display_text !== undefined) ret += a.display_text;
   else if (a.product_name) ret += a.product_name;
   else if (a.original_order_string) ret += a.original_order_string;
@@ -879,7 +890,11 @@ function orderGetToolTip(o, addOns) {
   parts.push(o.note || "");
   // Wes: show the line-item quantity in Order Details, but only when it's
   // actually more than 1 -- the common case (qty 1) doesn't need clutter.
-  if (o.quantity && o.quantity > 1) parts.push(`(Qty ${o.quantity})`);
+  // NOTE: single-quoted class attribute is load-bearing -- the final
+  // `.split('"').join("&quot;")` below escapes double quotes in the whole
+  // tooltip (needed for things like a literal 6" in original_order_string),
+  // which would otherwise mangle a double-quoted attribute here too.
+  if (o.quantity && o.quantity > 1) parts.push(`<b class='qty-flag'>(Qty ${o.quantity})</b>`);
   for (const add of addOns || []) parts.push(addonGetDisplay(add));
   return parts.join("\n").trim().split('"').join("&quot;");
 }
@@ -960,7 +975,20 @@ function batchGetTryBigRunnerSize(batch) {
         }
       }
     } else if (totalRunners > 0) {
-      events.push(makeParseEvent(1, "Could not determine big runner size automatically -- please set manually", orderNum));
+      // Wes: this only auto-assigns when the count of shoe line-items in
+      // the order exactly matches the total quantity of same-colored Big
+      // Runner add-ons for that order (see the `if` above) -- it can't
+      // safely guess which shoe gets which sole size otherwise. Spelling
+      // out the actual counts here (rather than a bare "couldn't
+      // determine") makes it possible to tell, from the message alone,
+      // whether that's a real ambiguous case or just a Big Runner
+      // add-on's own Lineitem quantity not being 1 as expected.
+      events.push(makeParseEvent(
+        1,
+        `Could not determine big runner size automatically (${orderItems.length} shoe item(s), ` +
+          `${totalTan} tan / ${totalBlack} black runner sole(s)) -- please set manually`,
+        orderNum
+      ));
     }
   }
   return events;
