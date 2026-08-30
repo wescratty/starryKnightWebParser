@@ -996,20 +996,43 @@ function batchGetTryBigRunnerSize(batch) {
         }
       }
     } else if (totalRunners > 0) {
-      // Wes: this only auto-assigns when the total quantity of shoes in
-      // the order exactly matches the total quantity of same-colored Big
-      // Runner add-ons for that order (see the `if` above) -- it can't
-      // safely guess which shoe gets which sole size otherwise. Spelling
-      // out the actual counts here (rather than a bare "couldn't
-      // determine") makes it possible to tell, from the message alone,
-      // whether that's a real ambiguous case or just a Big Runner
-      // add-on's own Lineitem quantity not matching the shoe's.
-      events.push(makeParseEvent(
-        1,
-        `Could not determine big runner size automatically (${totalShoeQty} shoe(s), ` +
-          `${totalTan} tan / ${totalBlack} black runner sole(s)) -- please set manually`,
-        orderNum
-      ));
+      // Wes: one specific mismatch is common and safe enough to default
+      // rather than punt to manual review -- exactly two shoes sharing one
+      // same-colored runner sole, both shoes sized in the plain numeric
+      // Toddler tier (no Kids/Men's/Women's prefix) at size 12 or under,
+      // and no note on the order (a note might spell out a different
+      // pairing, so it still needs a human look). In that specific case,
+      // the sole defaults to the larger of the two sizes.
+      const hasNote = note !== null;
+      const toddlerSizes = [];
+      for (const o of orderItems) {
+        const [tier, , number] = getSizeTier(o);
+        if (tier === 0 && number !== null && number <= 12) toddlerSizes.push({ size: o.size, number });
+      }
+      const bothToddler12OrUnder = toddlerSizes.length === orderItems.length;
+
+      if (totalShoeQty === 2 && totalRunners === 1 && !hasNote && bothToddler12OrUnder) {
+        let largest = toddlerSizes[0];
+        for (const s of toddlerSizes) if (s.number > largest.number) largest = s;
+        for (const add of addOns) {
+          if (add.add_type === AddonType.SOLE) add.size = largest.size;
+        }
+      } else {
+        // This only auto-assigns when the total quantity of shoes in the
+        // order exactly matches the total quantity of same-colored Big
+        // Runner add-ons for that order (see the `if` above) -- it can't
+        // safely guess which shoe gets which sole size otherwise beyond
+        // the two-shoes-one-sole default above. Spelling out the actual
+        // counts here (rather than a bare "couldn't determine") makes it
+        // possible to tell, from the message alone, whether that's a real
+        // ambiguous case or just a Lineitem quantity not matching up.
+        events.push(makeParseEvent(
+          1,
+          `Could not determine big runner size automatically (${totalShoeQty} shoe(s), ` +
+            `${totalTan} tan / ${totalBlack} black runner sole(s)) -- please set manually`,
+          orderNum
+        ));
+      }
     }
   }
   return events;
