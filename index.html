@@ -182,6 +182,20 @@ details.app-settings summary {
 .msg.warn { background: #fff6e0; color: #7a5c00; }
 .msg.error { background: #fdeaea; color: #942b2b; }
 
+.msg-jump {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0 0.35em 0 0;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  color: inherit;
+}
+.msg-jump:hover { opacity: 0.75; }
+.msg.msg-nomatch { opacity: 0.75; }
+
 #reportControls {
   margin: 16px 0;
   display: flex;
@@ -317,6 +331,20 @@ details.app-settings summary {
 #report .order.yellow { background-color: #FFBF00; }
 #report .order.gray { background-color: #d3d3d3; }
 #report .order.green { background-color: #90ee90; }
+
+/* "Jump to order" flash, triggered by clicking an unresolved-item message
+   above the report -- same idea as a browser's Ctrl+F match highlight, but
+   for a specific order button rather than text. */
+#report .order.jump-highlight {
+    outline: 3px solid #1a6fd6;
+    outline-offset: 1px;
+    animation: order-jump-flash 1.4s ease-out 2;
+}
+
+@keyframes order-jump-flash {
+    0%   { box-shadow: 0 0 0 6px rgba(26, 111, 214, 0.55); }
+    100% { box-shadow: 0 0 0 6px rgba(26, 111, 214, 0); }
+}
 
 @media print {
     @page { size: portrait; margin: 0.5in; }
@@ -849,6 +877,9 @@ function orderGetToolTip(o, addOns) {
   parts.push(`Order ${o.order_num}`);
   parts.push(o.original_order_string);
   parts.push(o.note || "");
+  // Wes: show the line-item quantity in Order Details, but only when it's
+  // actually more than 1 -- the common case (qty 1) doesn't need clutter.
+  if (o.quantity && o.quantity > 1) parts.push(`(Qty ${o.quantity})`);
   for (const add of addOns || []) parts.push(addonGetDisplay(add));
   return parts.join("\n").trim().split('"').join("&quot;");
 }
@@ -1266,7 +1297,7 @@ function buildMainTableHtml(batch) {
 
       const tooltip = orderGetToolTip(order, addOns).split(/\s+/).filter(Boolean).join(" ");
 
-      const sizeHtml = `\n                     <button class="order " ">\n                        ${size}\n                    </button>\n                `;
+      const sizeHtml = `\n                     <button class="order" data-order-num="${order.order_num}">\n                        ${size}\n                    </button>\n                `;
       const displayHtml = `<span class="display-text">${display}</span>`;
       const detailsHtml = `<span class="order-details">${tooltip}</span>`;
 
@@ -1483,11 +1514,44 @@ document.getElementById("clearLastProcessedBtn").addEventListener("click", () =>
   showMessage({ level: 0, message: "Timestamp cleared." });
 });
 
+function jumpToOrder(orderNum) {
+  const matches = reportEl.querySelectorAll(`.order[data-order-num="${CSS.escape(String(orderNum))}"]`);
+  if (!matches.length) return false;
+  matches.forEach((el) => {
+    el.classList.remove("jump-highlight");
+    // restart the CSS animation even if this order was just jumped to
+    void el.offsetWidth;
+    el.classList.add("jump-highlight");
+  });
+  matches[0].scrollIntoView({ behavior: "smooth", block: "center" });
+  return true;
+}
+
 function showMessage({ level, message, order_num }) {
   const div = document.createElement("div");
   const cls = level >= 2 ? "error" : level === 1 ? "warn" : "info";
   div.className = `msg ${cls}`;
-  div.textContent = order_num ? `${order_num} - ${message}` : message;
+
+  if (order_num) {
+    // Clickable order number -- jumps to and flashes the matching size
+    // button(s) in the report below, the way Ctrl+F highlights a match.
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "msg-jump";
+    btn.textContent = order_num;
+    btn.title = "Jump to this order in the report";
+    btn.addEventListener("click", () => {
+      if (!jumpToOrder(order_num)) {
+        div.classList.add("msg-nomatch");
+        btn.title = "No matching order found in the current report";
+      }
+    });
+    div.appendChild(btn);
+    div.appendChild(document.createTextNode(`- ${message}`));
+  } else {
+    div.textContent = message;
+  }
+
   messagesEl.appendChild(div);
 }
 
