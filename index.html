@@ -297,6 +297,12 @@ details.app-settings summary {
     font-size: 1.3em;
 }
 
+/* A cancelled order (Shopify's "Cancelled at" column had a timestamp) --
+   kept visible but crossed out, everywhere that order shows up. */
+#report .cancelled-strike {
+    text-decoration: line-through;
+}
+
 #report .table-columns {
     column-gap: 20px;
     column-fill: auto;
@@ -732,13 +738,14 @@ function parseOrderItemData(item, cfg) {
   return item;
 }
 
-function getOrderItem(text, timeStamp, { quantity = null, note = null, orderNum = null } = {}, cfg) {
+function getOrderItem(text, timeStamp, { quantity = null, note = null, orderNum = null, cancelled = false } = {}, cfg) {
   const order = newOrderItem({
     time_stamp: timeStamp,
     original_order_string: text,
     quantity,
     note,
     order_num: orderNum,
+    cancelled,
   });
   return parseOrderItemData(order, cfg);
 }
@@ -800,7 +807,7 @@ function classifyAddon(item) {
   }
 }
 
-function getAddOnItem(text, timeStamp, addType, { quantity = null, note = null, orderNum = null } = {}) {
+function getAddOnItem(text, timeStamp, addType, { quantity = null, note = null, orderNum = null, cancelled = false } = {}) {
   const add = newAddon({
     time_stamp: timeStamp,
     original_order_string: text,
@@ -809,6 +816,7 @@ function getAddOnItem(text, timeStamp, addType, { quantity = null, note = null, 
     quantity,
     note,
     order_num: orderNum,
+    cancelled,
   });
   classifyAddon(add);
   return add;
@@ -830,6 +838,7 @@ function newAddon(fields) {
     size: fields.size ?? null,
     prefix: fields.prefix ?? null,
     add_type: fields.add_type ?? null,
+    cancelled: fields.cancelled ?? false,
   };
 }
 
@@ -849,6 +858,7 @@ function newOrderItem(fields) {
     addOns: [],
     variant_full: fields.variant_full ?? null,
     colors: fields.colors ?? [],
+    cancelled: fields.cancelled ?? false,
   };
 }
 
@@ -1025,7 +1035,7 @@ function getClass(text, timeStamp, opts, cfg) {
   return getOrderItem(text, timeStamp, opts, cfg);
 }
 
-function parseOrders({ orderStrings, timestamps, quantities, notes, orderNums, archive = false, lastProcessed = null }, cfg) {
+function parseOrders({ orderStrings, timestamps, quantities, notes, orderNums, cancelledAt = null, archive = false, lastProcessed = null }, cfg) {
   const batch = newBatch();
   const events = [];
   let newestTimestamp = null;
@@ -1061,6 +1071,13 @@ function parseOrders({ orderStrings, timestamps, quantities, notes, orderNums, a
 
       const note = notes ? notes[i] : null;
 
+      // Wes: Shopify's "Cancelled at" column -- any non-blank timestamp
+      // there means the order was cancelled. Flag the item so the report
+      // can strike through its text, rather than silently dropping it
+      // (she should still see it was ordered, just crossed out).
+      const cancelledRaw = cancelledAt ? cancelledAt[i] : null;
+      const cancelled = !!(cancelledRaw && String(cancelledRaw).trim());
+
       if (ts && archive) {
         const currentDt = timestampToDate(ts);
         if (currentDt === null) {
@@ -1074,7 +1091,7 @@ function parseOrders({ orderStrings, timestamps, quantities, notes, orderNums, a
         }
       }
 
-      const item = getClass(text, ts, { quantity, note, orderNum }, cfg);
+      const item = getClass(text, ts, { quantity, note, orderNum, cancelled }, cfg);
 
       if (item.kind === "Addon") {
         batchAddAddOn(batch, item);
@@ -1325,9 +1342,13 @@ function buildMainTableHtml(batch) {
 
       const tooltip = orderGetToolTip(order, addOns).split(/\s+/).filter(Boolean).join(" ");
 
-      const sizeHtml = `\n                     <button class="order" data-order-num="${order.order_num}">\n                        ${size}\n                    </button>\n                `;
-      const displayHtml = `<span class="display-text">${display}</span>`;
-      const detailsHtml = `<span class="order-details">${tooltip}</span>`;
+      // Wes: a cancelled order (Shopify's "Cancelled at" column) gets
+      // struck through everywhere it's shown, rather than being hidden --
+      // she should still see it was there, just know not to cut it.
+      const cancelClass = order.cancelled ? " cancelled-strike" : "";
+      const sizeHtml = `\n                     <button class="order${cancelClass}" data-order-num="${order.order_num}">\n                        ${size}\n                    </button>\n                `;
+      const displayHtml = `<span class="display-text${cancelClass}">${display}</span>`;
+      const detailsHtml = `<span class="order-details${cancelClass}">${tooltip}</span>`;
 
       table.add([sizeHtml, displayHtml, detailsHtml]);
     }
@@ -1364,7 +1385,15 @@ function getAddOnReport(batch) {
         lastTier = tier;
       }
       const size = add.size ? add.size : 999;
-      table.add([add.order_num, size, addonGetDisplay(add)]);
+      if (add.cancelled) {
+        table.add([
+          `<span class="cancelled-strike">${add.order_num}</span>`,
+          `<span class="cancelled-strike">${size}</span>`,
+          `<span class="cancelled-strike">${addonGetDisplay(add)}</span>`,
+        ]);
+      } else {
+        table.add([add.order_num, size, addonGetDisplay(add)]);
+      }
     }
     addReport.add(table);
   }
@@ -1637,12 +1666,19 @@ function processCsv(text) {
     lastProcessed = timestampToDate(lastProcessedInput.value.trim());
   }
 
+  // "Cancelled at" is optional -- not every export includes it, and older
+  // CSVs shouldn't suddenly fail to load over a column we don't require.
+  if (!("Cancelled at" in tree)) {
+    showMessage({ level: 0, message: `No "Cancelled at" column found in this CSV -- cancelled orders won't be flagged.` });
+  }
+
   const { batch, events, newLastProcessed } = parseOrders({
     orderStrings: tree["Lineitem name"],
     timestamps: tree["Created at"],
     quantities: tree["Lineitem quantity"],
     notes: tree["Notes"],
     orderNums: tree["Name"],
+    cancelledAt: tree["Cancelled at"] || null,
     archive,
     lastProcessed,
   }, cfg);
