@@ -1479,19 +1479,49 @@ function getBottomsReport(orders) {
   return report;
 }
 
-function getLeatherOrder(orders) {
+// Wes: the color extractor sometimes keeps a trailing qualifier attached
+// to the matched color -- "sable(dark br)", "chai(top)", "rust (reddish
+// brown)" -- which the Leather Order tally then treats as a color
+// distinct from plain "sable"/"chai"/"rust", splitting one leather order
+// across two rows. This collapses that ONE specific, safe pattern: a
+// color string that is an exact known color name plus a single trailing
+// "(...)" qualifier. It deliberately leaves compound/combined entries
+// alone (e.g. "rust/w.wood", "chai/sahara") -- those could mean two
+// different leathers were actually ordered together, and collapsing them
+// would mean silently guessing how to split the quantity, which isn't a
+// call to make automatically.
+function normalizeLeatherColorKey(raw, colors) {
+  const trimmed = String(raw).trim();
+  const m = /^(.*?)\s*\([^)]*\)\s*$/.exec(trimmed);
+  if (m) {
+    const base = m[1].trim().toLowerCase();
+    if (colors.includes(base)) return base;
+  }
+  return trimmed;
+}
+
+function getLeatherOrder(orders, colors = DEFAULT_COLORS.map((c) => c.toLowerCase())) {
   const small = {}, kid = {}, adult = {};
   const prefixes = new Set(["M", "W", "Kids"]);
   for (const order of orders) {
     if (prefixes.has(order.prefix)) {
       if (order.prefix === "M" || order.prefix === "W") {
-        for (const color of order.colors) adult[color] = (adult[color] || 0) + order.quantity;
+        for (const color of order.colors) {
+          const key = normalizeLeatherColorKey(color, colors);
+          adult[key] = (adult[key] || 0) + order.quantity;
+        }
       }
       if (order.prefix === "Kids") {
-        for (const color of order.colors) kid[color] = (kid[color] || 0) + order.quantity;
+        for (const color of order.colors) {
+          const key = normalizeLeatherColorKey(color, colors);
+          kid[key] = (kid[key] || 0) + order.quantity;
+        }
       }
     } else {
-      for (const color of order.colors) small[color] = (small[color] || 0) + order.quantity;
+      for (const color of order.colors) {
+        const key = normalizeLeatherColorKey(color, colors);
+        small[key] = (small[key] || 0) + order.quantity;
+      }
     }
   }
   const report = new Report();
@@ -1733,7 +1763,7 @@ function processCsv(text) {
 
   const mainTableHtml = buildMainTableHtml(batch).makeFlat();
   const bottomsHtml = getBottomsReport(orders).make(2);
-  const leatherHtml = getLeatherOrder(orders).make(3);
+  const leatherHtml = getLeatherOrder(orders, cfg.colors).make(3);
   const [addReportObj, addonEvents] = getAddOnReport(batch);
   for (const e of addonEvents) showMessage(e);
   const addonHtml = addReportObj.make(2);
