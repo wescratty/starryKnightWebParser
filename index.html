@@ -304,15 +304,17 @@ details.app-settings summary {
 }
 
 #report .table-columns {
+    display: grid;
+    /* grid-template-columns is set inline per-report (matches how many
+       tables it has, up to its maxTables) -- see getGridOfTables(). */
     column-gap: 20px;
-    column-fill: auto;
+    align-items: start;
     margin-bottom: 20px;
 }
 
 #report .table-block {
     break-inside: avoid;
     page-break-inside: avoid;
-    -webkit-column-break-inside: avoid;
     margin-bottom: 20px;
 }
 
@@ -1217,7 +1219,14 @@ class Report {
   getGridOfTables(tables, maxTables) {
     if (!tables.length) return "";
     const columnCount = Math.max(1, Math.min(maxTables, tables.length));
-    const html = [`<div class="table-columns" style="column-count:${columnCount};">`];
+    // Wes: CSS multi-column layout (column-count) only distributes content
+    // into later columns once it knows a target column height -- with no
+    // fixed height on this container, browsers can end up rendering every
+    // block in a single tall column on screen (looking "stacked") even
+    // though column-count says 2 or 3. CSS Grid places a fixed number of
+    // columns side by side regardless of content height, so it doesn't
+    // have that failure mode.
+    const html = [`<div class="table-columns" style="grid-template-columns: repeat(${columnCount}, 1fr);">`];
     for (const table of tables) html.push(`<div class="table-block">${this.makeHtmlTable(table)}</div>`);
     html.push("</div>");
     html.push('<div class="page-break"></div>');
