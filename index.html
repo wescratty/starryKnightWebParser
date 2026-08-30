@@ -1500,6 +1500,34 @@ function normalizeLeatherColorKey(raw, colors) {
   return trimmed;
 }
 
+// Wes: for the Leather Order tally ONLY -- these color names are treated
+// as the same leather for ordering purposes, so a hit on the left side
+// tallies under the name on the right instead. Doesn't touch anything
+// outside this report (order details, add-on colors, etc. still show the
+// literal color as typed).
+const LEATHER_COLOR_ALIASES = {
+  "w.wood": "wood",
+  "russet": "sepia",
+  "tan": "camel",
+  "flax": "barley",
+};
+
+// A slash-combined entry like "chai/sahara" or "rust/w.wood" means both
+// leathers were ordered together on that one line -- Wes wants each side
+// tallied for its full quantity (not split/divided), and the combined
+// entry itself dropped rather than kept as its own row.
+function resolveLeatherColorKeys(raw, colors) {
+  const trimmed = String(raw).trim();
+  const parts = trimmed.includes("/") ? trimmed.split("/") : [trimmed];
+  return parts
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => {
+      const base = normalizeLeatherColorKey(p, colors);
+      return LEATHER_COLOR_ALIASES[base.toLowerCase()] || base;
+    });
+}
+
 function getLeatherOrder(orders, colors = DEFAULT_COLORS.map((c) => c.toLowerCase())) {
   const small = {}, kid = {}, adult = {};
   const prefixes = new Set(["M", "W", "Kids"]);
@@ -1507,20 +1535,23 @@ function getLeatherOrder(orders, colors = DEFAULT_COLORS.map((c) => c.toLowerCas
     if (prefixes.has(order.prefix)) {
       if (order.prefix === "M" || order.prefix === "W") {
         for (const color of order.colors) {
-          const key = normalizeLeatherColorKey(color, colors);
-          adult[key] = (adult[key] || 0) + order.quantity;
+          for (const key of resolveLeatherColorKeys(color, colors)) {
+            adult[key] = (adult[key] || 0) + order.quantity;
+          }
         }
       }
       if (order.prefix === "Kids") {
         for (const color of order.colors) {
-          const key = normalizeLeatherColorKey(color, colors);
-          kid[key] = (kid[key] || 0) + order.quantity;
+          for (const key of resolveLeatherColorKeys(color, colors)) {
+            kid[key] = (kid[key] || 0) + order.quantity;
+          }
         }
       }
     } else {
       for (const color of order.colors) {
-        const key = normalizeLeatherColorKey(color, colors);
-        small[key] = (small[key] || 0) + order.quantity;
+        for (const key of resolveLeatherColorKeys(color, colors)) {
+          small[key] = (small[key] || 0) + order.quantity;
+        }
       }
     }
   }
