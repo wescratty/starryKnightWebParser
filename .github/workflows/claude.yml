@@ -36,4 +36,4 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
-            --allowedTools "Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue close:*)"
+            --allowedTools "Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue close:*),Bash(gh issue comment:*)"
